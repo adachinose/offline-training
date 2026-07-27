@@ -8,10 +8,10 @@ const DEFAULT_DATA = {
     { id: 'sample-timer', name: '10-20-30 × 3', durations: [10, 20, 30], repeatCount: 3 }
   ],
   directionPresets: [
-    { id: 'sample-direction', name: 'ランダム 2〜5秒', mode: 'random', fixed: 3, min: 2, max: 5 }
+    { id: 'sample-direction', name: 'ランダム 2〜5秒', mode: 'random', fixed: 3, min: 2, max: 5, runSeconds: null }
   ],
   lastTimer: { durations: [10, 20, 30], repeatCount: 1 },
-  lastDirection: { mode: 'random', fixed: 3, min: 2, max: 5 }
+  lastDirection: { mode: 'random', fixed: 3, min: 2, max: 5, runSeconds: null }
 };
 
 const DIRECTIONS = [
@@ -29,6 +29,7 @@ let appData = loadData();
 let toastTimer = null;
 let audioContext = null;
 let wakeLock = null;
+const activeTimerCueOscillators = new Set();
 
 const timerRun = {
   active: false,
@@ -54,8 +55,14 @@ const directionRun = {
   phase: 'idle',
   transitionTimer: null,
   blankTimer: null,
+  endTimer: null,
+  progressTimer: null,
   nextTransitionAt: 0,
-  remainingMs: 0
+  remainingMs: 0,
+  runSeconds: null,
+  executionStarted: false,
+  executionEndAt: 0,
+  executionRemainingMs: 0
 };
 
 function clone(value) {
@@ -183,15 +190,26 @@ function updateRepeatVisibility() {
   $('repeatCountRow').classList.toggle('hidden', mode !== 'repeat');
 }
 
+function parseOptionalRunSeconds(raw) {
+  const value = raw.trim();
+  if (!value) return null;
+  const seconds = Number(value);
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400) {
+    throw new Error('実行時間は1〜86400秒の整数、または未入力にしてください。');
+  }
+  return seconds;
+}
+
 function getDirectionFormValues() {
   const mode = document.querySelector('input[name="intervalMode"]:checked').value;
   const fixed = clampInteger($('fixedIntervalSelect').value, 1, 10, 3);
   let min = clampInteger($('randomMinSelect').value, 1, 10, 2);
   let max = clampInteger($('randomMaxSelect').value, 1, 10, 5);
+  const runSeconds = parseOptionalRunSeconds($('directionRunSecondsInput').value);
   if (min > max) [min, max] = [max, min];
   $('randomMinSelect').value = String(min);
   $('randomMaxSelect').value = String(max);
-  return { mode, fixed, min, max };
+  return { mode, fixed, min, max, runSeconds };
 }
 
 function applyDirectionSettings(settings) {
@@ -199,11 +217,15 @@ function applyDirectionSettings(settings) {
   const fixed = clampInteger(settings.fixed, 1, 10, 3);
   let min = clampInteger(settings.min, 1, 10, 2);
   let max = clampInteger(settings.max, 1, 10, 5);
+  const runSeconds = settings.runSeconds == null
+    ? null
+    : clampInteger(settings.runSeconds, 1, 86400, null);
   if (min > max) [min, max] = [max, min];
   document.querySelector(`input[name="intervalMode"][value="${mode}"]`).checked = true;
   fillSecondSelect($('fixedIntervalSelect'), fixed);
   fillSecondSelect($('randomMinSelect'), min);
   fillSecondSelect($('randomMaxSelect'), max);
+  $('directionRunSecondsInput').value = runSeconds == null ? '' : String(runSeconds);
   updateIntervalVisibility();
 }
 
@@ -228,7 +250,14 @@ async function unlockAudio() {
   oscillator.stop(audioContext.currentTime + 0.01);
 }
 
-function scheduleTone(frequency, startOffset, duration, volume = 0.48) {
+function stopTimerCue() {
+  activeTimerCueOscillators.forEach((oscillator) => {
+    try { oscillator.stop(); } catch (error) { /* すでに停止済み */ }
+  });
+  activeTimerCueOscillators.clear();
+}
+
+function scheduleTone(frequency, startOffset, duration, volume = 0.48, group = 'general') {
   if (!audioContext || audioContext.state !== 'running') return;
   const start = audioContext.currentTime + startOffset;
   const oscillator = audioContext.createOscillator();
@@ -239,8 +268,30 @@ function scheduleTone(frequency, startOffset, duration, volume = 0.48) {
   gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
   oscillator.connect(gain).connect(audioContext.destination);
+  if (group === 'timer') {
+    activeTimerCueOscillators.add(oscillator);
+    oscillator.addEventListener('ended', () => activeTimerCueOscillators.delete(oscillator), { once: true });
+  }
   oscillator.start(start);
   oscillator.stop(start + duration + 0.03);
+}
+
+function playTimerRhythm(kind) {
+  stopTimerCue();
+  const notes = kind === 'finish'
+    ? [
+        [740, 0.00, 0.18], [920, 0.28, 0.18], [1160, 0.56, 0.28],
+        [740, 1.05, 0.18], [920, 1.33, 0.18], [1160, 1.61, 0.28],
+        [920, 2.10, 0.18], [1160, 2.38, 0.18], [1460, 2.66, 0.34]
+      ]
+    : [
+        [880, 0.00, 0.16], [880, 0.28, 0.16], [1120, 0.56, 0.24],
+        [880, 1.00, 0.16], [880, 1.28, 0.16], [1120, 1.56, 0.24],
+        [880, 2.00, 0.16], [1120, 2.28, 0.16], [1320, 2.56, 0.34]
+      ];
+  notes.forEach(([frequency, offset, duration]) => {
+    scheduleTone(frequency, offset, duration, 0.58, 'timer');
+  });
 }
 
 function playCue(kind = 'segment') {
@@ -249,20 +300,19 @@ function playCue(kind = 'segment') {
     scheduleTone(920, 0, 0.12, 0.55);
     return;
   }
-  if (kind === 'finish') {
-    scheduleTone(740, 0, 0.12, 0.55);
-    scheduleTone(920, 0.17, 0.12, 0.55);
-    scheduleTone(1160, 0.34, 0.22, 0.6);
+  if (kind === 'directionFinish') {
+    scheduleTone(760, 0.00, 0.14, 0.55);
+    scheduleTone(980, 0.22, 0.14, 0.58);
+    scheduleTone(1240, 0.44, 0.24, 0.62);
     return;
   }
-  scheduleTone(760, 0, 0.13, 0.55);
-  scheduleTone(980, 0.18, 0.18, 0.58);
+  playTimerRhythm(kind === 'finish' ? 'finish' : 'segment');
 }
 
-async function testSound() {
+async function testSound(kind) {
   try {
     await unlockAudio();
-    playCue('segment');
+    playCue(kind);
   } catch (error) {
     showToast(error.message);
   }
@@ -392,6 +442,7 @@ async function startTimer() {
 
   appData.lastTimer = clone(settings);
   saveData();
+  stopTimerCue();
   timerRun.active = true;
   timerRun.paused = false;
   timerRun.durations = settings.durations;
@@ -410,6 +461,7 @@ async function startTimer() {
 
 function pauseTimer(auto = false) {
   if (!timerRun.active || timerRun.paused) return;
+  stopTimerCue();
   timerRun.remainingMs = Math.max(0, timerRun.endAt - Date.now());
   timerRun.paused = true;
   clearTimerHandles();
@@ -434,6 +486,7 @@ async function resumeTimer() {
 function restartTimer() {
   if (!timerRun.durations.length) return;
   clearTimerHandles();
+  stopTimerCue();
   timerRun.active = true;
   timerRun.paused = false;
   timerRun.roundIndex = 0;
@@ -448,6 +501,7 @@ function restartTimer() {
 
 function stopTimer() {
   clearTimerHandles();
+  stopTimerCue();
   timerRun.active = false;
   timerRun.paused = false;
   releaseWakeLock();
@@ -465,34 +519,85 @@ function setArrow(direction) {
   $('directionLabel').textContent = direction.label;
 }
 
-function clearDirectionHandles() {
+function clearDirectionSwitchHandles() {
   clearTimeout(directionRun.transitionTimer);
   clearTimeout(directionRun.blankTimer);
   directionRun.transitionTimer = null;
   directionRun.blankTimer = null;
 }
 
+function clearDirectionExecutionHandles() {
+  clearTimeout(directionRun.endTimer);
+  clearInterval(directionRun.progressTimer);
+  directionRun.endTimer = null;
+  directionRun.progressTimer = null;
+}
+
+function clearDirectionHandles() {
+  clearDirectionSwitchHandles();
+  clearDirectionExecutionHandles();
+}
+
+function directionRemainingMs() {
+  if (!directionRun.runSeconds) return null;
+  if (!directionRun.executionStarted) return directionRun.executionRemainingMs;
+  if (directionRun.paused) return directionRun.executionRemainingMs;
+  return Math.max(0, directionRun.executionEndAt - Date.now());
+}
+
+function updateDirectionCounter() {
+  const remaining = directionRemainingMs();
+  $('directionCounter').textContent = remaining == null
+    ? `${directionRun.count}回`
+    : `${directionRun.count}回・残り ${Math.ceil(remaining / 1000)}秒`;
+}
+
+function scheduleDirectionExecution(delay) {
+  if (!directionRun.runSeconds) return;
+  clearDirectionExecutionHandles();
+  directionRun.executionStarted = true;
+  directionRun.executionRemainingMs = Math.max(0, delay);
+  directionRun.executionEndAt = Date.now() + directionRun.executionRemainingMs;
+  directionRun.endTimer = setTimeout(finishDirection, directionRun.executionRemainingMs);
+  directionRun.progressTimer = setInterval(updateDirectionCounter, 100);
+  updateDirectionCounter();
+}
+
 function scheduleDirectionTransition(delay = directionIntervalMs()) {
   clearTimeout(directionRun.transitionTimer);
-  directionRun.nextTransitionAt = Date.now() + delay;
-  directionRun.transitionTimer = setTimeout(beginDirectionTransition, delay);
+  let actualDelay = delay;
+  const runRemaining = directionRemainingMs();
+  if (runRemaining != null) actualDelay = Math.min(actualDelay, runRemaining);
+  directionRun.nextTransitionAt = Date.now() + actualDelay;
+  directionRun.transitionTimer = setTimeout(beginDirectionTransition, actualDelay);
 }
 
 function emitDirection() {
   if (!directionRun.active || directionRun.paused) return;
+  if (directionRun.runSeconds && !directionRun.executionStarted) {
+    scheduleDirectionExecution(directionRun.executionRemainingMs);
+  }
+  if (directionRun.runSeconds && directionRemainingMs() <= 0) {
+    finishDirection();
+    return;
+  }
   const direction = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
   setArrow(direction);
   $('directionReady').classList.add('hidden');
   $('arrowWrap').classList.remove('hidden');
   directionRun.phase = 'shown';
   directionRun.count += 1;
-  $('directionCounter').textContent = `${directionRun.count}回`;
+  updateDirectionCounter();
   playCue('direction');
   scheduleDirectionTransition();
 }
 
 function beginDirectionTransition() {
   if (!directionRun.active || directionRun.paused) return;
+  if (directionRun.runSeconds && directionRemainingMs() <= 0) {
+    finishDirection();
+    return;
+  }
   $('arrowWrap').classList.add('hidden');
   directionRun.phase = 'blank';
   clearTimeout(directionRun.blankTimer);
@@ -517,9 +622,12 @@ async function startDirection() {
     paused: false,
     count: 0,
     phase: 'blank',
-    remainingMs: 0
+    remainingMs: 0,
+    executionStarted: false,
+    executionEndAt: 0,
+    executionRemainingMs: settings.runSeconds ? settings.runSeconds * 1000 : 0
   });
-  $('directionCounter').textContent = '0回';
+  updateDirectionCounter();
   $('arrowWrap').classList.add('hidden');
   $('directionReady').classList.remove('hidden');
   $('directionReady').textContent = '開始';
@@ -538,8 +646,14 @@ function pauseDirection(auto = false) {
   } else {
     directionRun.remainingMs = 0;
   }
+  if (directionRun.runSeconds) {
+    directionRun.executionRemainingMs = directionRun.executionStarted
+      ? Math.max(0, directionRun.executionEndAt - Date.now())
+      : directionRun.executionRemainingMs;
+  }
   directionRun.paused = true;
   clearDirectionHandles();
+  updateDirectionCounter();
   $('directionPausedOverlay').classList.remove('hidden');
   $('pauseDirectionBtn').textContent = '再開';
   releaseWakeLock();
@@ -549,10 +663,17 @@ function pauseDirection(auto = false) {
 async function resumeDirection() {
   if (!directionRun.active || !directionRun.paused) return;
   try { await unlockAudio(); } catch (error) { showToast(error.message); return; }
+  if (directionRun.runSeconds && directionRun.executionStarted && directionRun.executionRemainingMs <= 0) {
+    finishDirection();
+    return;
+  }
   directionRun.paused = false;
   $('directionPausedOverlay').classList.add('hidden');
   $('pauseDirectionBtn').textContent = '一時停止';
   await requestWakeLock();
+  if (directionRun.runSeconds && directionRun.executionStarted) {
+    scheduleDirectionExecution(directionRun.executionRemainingMs);
+  }
   if (directionRun.phase === 'shown' && directionRun.remainingMs > 0) {
     scheduleDirectionTransition(directionRun.remainingMs);
   } else {
@@ -563,12 +684,32 @@ async function resumeDirection() {
 }
 
 function forceNextDirection() {
-  if (!directionRun.active) return;
-  if (directionRun.paused) return;
-  clearDirectionHandles();
+  if (!directionRun.active || directionRun.paused) return;
+  if (directionRun.runSeconds && directionRemainingMs() <= 0) {
+    finishDirection();
+    return;
+  }
+  clearDirectionSwitchHandles();
   $('arrowWrap').classList.add('hidden');
   directionRun.phase = 'blank';
   directionRun.blankTimer = setTimeout(emitDirection, BLANK_MS);
+}
+
+function finishDirection() {
+  if (!directionRun.active) return;
+  clearDirectionHandles();
+  directionRun.active = false;
+  directionRun.paused = false;
+  directionRun.executionRemainingMs = 0;
+  $('arrowWrap').classList.add('hidden');
+  $('directionReady').classList.remove('hidden');
+  $('directionReady').textContent = '終了';
+  $('directionCounter').textContent = `${directionRun.count}回・終了`;
+  $('directionPausedOverlay').classList.add('hidden');
+  $('pauseDirectionBtn').textContent = '一時停止';
+  playCue('directionFinish');
+  releaseWakeLock();
+  setTimeout(() => showToast('方向指示を終了しました。'), 250);
 }
 
 function stopDirection() {
@@ -622,10 +763,18 @@ function deleteTimerPreset() {
 }
 
 function saveDirectionPreset() {
-  const settings = getDirectionFormValues();
-  const defaultName = settings.mode === 'fixed'
+  setError('directionSetupError');
+  let settings;
+  try { settings = getDirectionFormValues(); } catch (error) {
+    setError('directionSetupError', error.message);
+    return;
+  }
+  const intervalName = settings.mode === 'fixed'
     ? `指定 ${settings.fixed}秒`
     : `ランダム ${settings.min}〜${settings.max}秒`;
+  const defaultName = settings.runSeconds
+    ? `${intervalName}・${settings.runSeconds}秒間`
+    : intervalName;
   const name = $('directionPresetName').value.trim() || defaultName;
   const existing = appData.directionPresets.find((preset) => preset.name === name);
   let id;
@@ -715,8 +864,8 @@ function bindEvents() {
   $('saveDirectionPresetBtn').addEventListener('click', saveDirectionPreset);
   $('deleteDirectionPresetBtn').addEventListener('click', deleteDirectionPreset);
 
-  $('testSoundTimerBtn').addEventListener('click', testSound);
-  $('testSoundDirectionBtn').addEventListener('click', testSound);
+  $('testSoundTimerBtn').addEventListener('click', () => testSound('segment'));
+  $('testSoundDirectionBtn').addEventListener('click', () => testSound('direction'));
   $('startTimerBtn').addEventListener('click', startTimer);
   $('startDirectionBtn').addEventListener('click', startDirection);
 

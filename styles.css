@@ -120,7 +120,7 @@ button { -webkit-tap-highlight-color: transparent; }
   display: grid; grid-template-columns: 50px 1fr 50px; align-items: center; z-index: 3;
 }
 .run-icon-button { background: rgba(255,255,255,.09); font-size: 1.6rem; }
-.run-progress { text-align: center; color: #d4daea; font-weight: 750; }
+.run-progress { text-align: center; color: #d4daea; font-weight: 750; font-size: clamp(.72rem, 3.2vw, 1rem); white-space: nowrap; }
 .timer-stage, .direction-stage { flex: 1; min-height: 0; display: grid; place-items: center; align-content: center; position: relative; }
 .run-label { margin: 0; color: var(--muted); font-size: clamp(1rem, 4vw, 1.6rem); font-weight: 700; }
 .countdown-display { font-size: min(58vw, 58vh); line-height: .9; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.08em; white-space: nowrap; }
