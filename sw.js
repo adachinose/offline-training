@@ -1,10 +1,10 @@
-const CACHE_NAME = 'offline-training-v1.3.0';
+const CACHE_NAME = 'offline-training-v1.4.0';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.webmanifest',
+  './styles.css?v=1.4.0',
+  './app.js?v=1.4.0',
+  './manifest.webmanifest?v=1.4.0',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png'
@@ -17,31 +17,32 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-    ))
+    Promise.all([
+      caches.keys().then((keys) => Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      )),
+      self.clients.claim()
+    ])
   );
-  self.clients.claim();
 });
 
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response && response.ok && new URL(request.url).origin === self.location.origin) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cached = await caches.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    if (request.mode === 'navigate') return caches.match('./index.html');
+    return new Response('', { status: 503, statusText: 'Offline' });
+  }
+}
+
 self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  if (request.method !== 'GET') return;
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(request).then((response) => {
-        if (response && response.ok && new URL(request.url).origin === self.location.origin) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      }).catch(() => {
-        if (request.mode === 'navigate') return caches.match('./index.html');
-        return new Response('', { status: 503, statusText: 'Offline' });
-      });
-    })
-  );
+  if (event.request.method !== 'GET') return;
+  event.respondWith(networkFirst(event.request));
 });

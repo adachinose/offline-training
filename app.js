@@ -1,5 +1,6 @@
 'use strict';
 
+const APP_VERSION = '1.4.0';
 const STORAGE_KEY = 'offline-training-settings-v1';
 const BLANK_MS = 180;
 
@@ -847,7 +848,8 @@ async function registerServiceWorker() {
   updateOfflineBadge();
   if (!('serviceWorker' in navigator) || !(window.isSecureContext || location.hostname === 'localhost')) return;
   try {
-    await navigator.serviceWorker.register('./sw.js');
+    const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+    await registration.update();
     await navigator.serviceWorker.ready;
     updateOfflineBadge();
     navigator.serviceWorker.addEventListener('controllerchange', updateOfflineBadge);
@@ -914,6 +916,8 @@ function bindEvents() {
 }
 
 function initialize() {
+  document.querySelectorAll('[data-app-version]').forEach((node) => { node.textContent = `v${APP_VERSION}`; });
+  document.getElementById('nextDirectionBtn')?.remove();
   fillSecondSelect($('fixedIntervalSelect'), 3);
   fillSecondSelect($('randomMinSelect'), 2);
   fillSecondSelect($('randomMaxSelect'), 5);

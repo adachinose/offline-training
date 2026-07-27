@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="トレーニング">
   <meta name="format-detection" content="telephone=no">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="manifest" href="manifest.webmanifest?v=1.4.0">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1.4.0">
   <title>トレーニングタイマー</title>
 </head>
 <body>
@@ -40,6 +40,7 @@
 
       <footer class="home-footer">
         <button id="showInstallHelpBtn" class="text-button" type="button">iPhoneへの追加方法</button>
+        <span class="version-label" data-app-version>v1.4.0</span>
       </footer>
     </section>
 
@@ -50,16 +51,21 @@
         <span class="header-spacer" aria-hidden="true"></span>
       </header>
 
-      <main class="settings-content">
-        <section class="panel setup-quick-panel">
-          <label class="field-label" for="timerPresetSelect">保存済み設定</label>
+      <section class="setup-launch-area" aria-label="タイマーのクイック開始">
+        <div class="setup-launch-inner">
+          <div class="launch-heading-row">
+            <label class="field-label" for="timerPresetSelect">保存済み設定</label>
+            <span class="version-label" data-app-version>v1.4.0</span>
+          </div>
           <div class="row gap-sm">
             <select id="timerPresetSelect" class="field grow" aria-label="保存済みタイマー設定"></select>
             <button id="loadTimerPresetBtn" class="secondary-button" type="button">読込</button>
           </div>
           <button id="startTimerBtn" class="primary-button wide-button quick-start-button" type="button">開始</button>
-        </section>
+        </div>
+      </section>
 
+      <main class="settings-content">
         <section class="panel">
           <label class="field-label" for="durationInput">秒数</label>
           <input id="durationInput" class="field large-field" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 10, 20, 30" aria-describedby="durationHelp">
@@ -131,16 +137,21 @@
         <span class="header-spacer" aria-hidden="true"></span>
       </header>
 
-      <main class="settings-content">
-        <section class="panel setup-quick-panel">
-          <label class="field-label" for="directionPresetSelect">保存済み設定</label>
+      <section class="setup-launch-area" aria-label="方向指示のクイック開始">
+        <div class="setup-launch-inner">
+          <div class="launch-heading-row">
+            <label class="field-label" for="directionPresetSelect">保存済み設定</label>
+            <span class="version-label" data-app-version>v1.4.0</span>
+          </div>
           <div class="row gap-sm">
             <select id="directionPresetSelect" class="field grow" aria-label="保存済み方向指示設定"></select>
             <button id="loadDirectionPresetBtn" class="secondary-button" type="button">読込</button>
           </div>
           <button id="startDirectionBtn" class="primary-button wide-button quick-start-button" type="button">開始</button>
-        </section>
+        </div>
+      </section>
 
+      <main class="settings-content">
         <section class="panel">
           <div class="segmented-control" role="group" aria-label="間隔方式">
             <label>
@@ -236,6 +247,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js" defer></script>
+  <script src="app.js?v=1.4.0" defer></script>
 </body>
 </html>
