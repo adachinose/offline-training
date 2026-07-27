@@ -51,12 +51,13 @@
       </header>
 
       <main class="settings-content">
-        <section class="panel">
+        <section class="panel setup-quick-panel">
           <label class="field-label" for="timerPresetSelect">保存済み設定</label>
           <div class="row gap-sm">
             <select id="timerPresetSelect" class="field grow" aria-label="保存済みタイマー設定"></select>
             <button id="loadTimerPresetBtn" class="secondary-button" type="button">読込</button>
           </div>
+          <button id="startTimerBtn" class="primary-button wide-button quick-start-button" type="button">開始</button>
         </section>
 
         <section class="panel">
@@ -98,7 +99,6 @@
 
         <div class="action-stack">
           <button id="testSoundTimerBtn" class="secondary-button wide-button" type="button">音を確認</button>
-          <button id="startTimerBtn" class="primary-button wide-button" type="button">開始</button>
         </div>
       </main>
     </section>
@@ -132,12 +132,13 @@
       </header>
 
       <main class="settings-content">
-        <section class="panel">
+        <section class="panel setup-quick-panel">
           <label class="field-label" for="directionPresetSelect">保存済み設定</label>
           <div class="row gap-sm">
             <select id="directionPresetSelect" class="field grow" aria-label="保存済み方向指示設定"></select>
             <button id="loadDirectionPresetBtn" class="secondary-button" type="button">読込</button>
           </div>
+          <button id="startDirectionBtn" class="primary-button wide-button quick-start-button" type="button">開始</button>
         </section>
 
         <section class="panel">
@@ -187,7 +188,6 @@
 
         <div class="action-stack">
           <button id="testSoundDirectionBtn" class="secondary-button wide-button" type="button">音を確認</button>
-          <button id="startDirectionBtn" class="primary-button wide-button" type="button">開始</button>
         </div>
       </main>
     </section>
@@ -213,7 +213,7 @@
 
       <footer class="run-controls">
         <button id="pauseDirectionBtn" class="control-button" type="button">一時停止</button>
-        <button id="nextDirectionBtn" class="control-button" type="button">次の方向</button>
+        <button id="restartDirectionBtn" class="control-button" type="button">最初から</button>
       </footer>
       <div id="directionPausedOverlay" class="paused-overlay hidden" aria-live="polite">一時停止</div>
     </section>

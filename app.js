@@ -683,16 +683,33 @@ async function resumeDirection() {
   }
 }
 
-function forceNextDirection() {
-  if (!directionRun.active || directionRun.paused) return;
-  if (directionRun.runSeconds && directionRemainingMs() <= 0) {
-    finishDirection();
+async function restartDirection() {
+  try {
+    await unlockAudio();
+  } catch (error) {
+    showToast(error.message);
     return;
   }
-  clearDirectionSwitchHandles();
+
+  clearDirectionHandles();
+  Object.assign(directionRun, {
+    active: true,
+    paused: false,
+    count: 0,
+    phase: 'blank',
+    remainingMs: 0,
+    executionStarted: false,
+    executionEndAt: 0,
+    executionRemainingMs: directionRun.runSeconds ? directionRun.runSeconds * 1000 : 0
+  });
+  updateDirectionCounter();
   $('arrowWrap').classList.add('hidden');
-  directionRun.phase = 'blank';
-  directionRun.blankTimer = setTimeout(emitDirection, BLANK_MS);
+  $('directionReady').classList.remove('hidden');
+  $('directionReady').textContent = '開始';
+  $('directionPausedOverlay').classList.add('hidden');
+  $('pauseDirectionBtn').textContent = '一時停止';
+  await requestWakeLock();
+  directionRun.blankTimer = setTimeout(emitDirection, 500);
 }
 
 function finishDirection() {
@@ -873,7 +890,7 @@ function bindEvents() {
   $('restartTimerBtn').addEventListener('click', restartTimer);
   $('exitTimerBtn').addEventListener('click', stopTimer);
   $('pauseDirectionBtn').addEventListener('click', () => directionRun.paused ? resumeDirection() : pauseDirection());
-  $('nextDirectionBtn').addEventListener('click', forceNextDirection);
+  $('restartDirectionBtn').addEventListener('click', restartDirection);
   $('exitDirectionBtn').addEventListener('click', stopDirection);
 
   $('fullscreenTimerBtn').addEventListener('click', enterFullscreen);
