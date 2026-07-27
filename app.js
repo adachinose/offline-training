@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const STORAGE_KEY = 'offline-training-settings-v1';
 const BLANK_MS = 180;
 

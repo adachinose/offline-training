@@ -1,10 +1,10 @@
-const CACHE_NAME = 'offline-training-v1.4.0';
+const CACHE_NAME = 'offline-training-v1.4.1';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=1.4.0',
-  './app.js?v=1.4.0',
-  './manifest.webmanifest?v=1.4.0',
+  './styles.css?v=1.4.1',
+  './app.js?v=1.4.1',
+  './manifest.webmanifest?v=1.4.1',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png'

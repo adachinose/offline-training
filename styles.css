@@ -133,7 +133,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .run-view { background: #03050a; overflow: hidden; touch-action: manipulation; user-select: none; }
 .run-header {
   min-height: calc(60px + var(--safe-top)); padding: calc(10px + var(--safe-top)) 14px 6px;
-  display: grid; grid-template-columns: 50px 1fr 50px; align-items: center; z-index: 3;
+  display: grid; grid-template-columns: 50px 1fr 50px; align-items: center;
+  position: relative; z-index: 3;
 }
 .run-icon-button { background: rgba(255,255,255,.09); font-size: 1.6rem; }
 .run-progress { text-align: center; color: #d4daea; font-weight: 750; font-size: clamp(.72rem, 3.2vw, 1rem); white-space: nowrap; }
@@ -144,9 +145,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .countdown-display[data-digits="4"] { font-size: min(29vw, 50vh); }
 .run-subline, .run-next { margin: 8px 0 0; color: var(--muted); font-weight: 700; }
 .run-next { font-size: .88rem; }
-.run-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px calc(12px + var(--safe-bottom)); z-index: 4; }
+.run-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px calc(12px + var(--safe-bottom)); position: relative; z-index: 4; }
 .control-button { border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: var(--text); }
-.paused-overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(0,0,0,.78); font-size: clamp(2rem, 10vw, 5rem); font-weight: 900; letter-spacing: .03em; }
+.paused-overlay { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; pointer-events: none; background: rgba(0,0,0,.78); font-size: clamp(2rem, 10vw, 5rem); font-weight: 900; letter-spacing: .03em; }
 
 .direction-stage { padding: 0 8px; }
 .arrow-wrap { width: min(86vw, 74vh); height: min(86vw, 74vh); display: grid; place-items: center; position: relative; }
