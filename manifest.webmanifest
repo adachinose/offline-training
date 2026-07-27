@@ -1,0 +1,15 @@
+{
+  "name": "オフライントレーニング",
+  "short_name": "トレーニング",
+  "description": "複数区間タイマーとランダム6方向指示を備えたオフライントレーニングアプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080b14",
+  "theme_color": "#0b1020",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

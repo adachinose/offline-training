@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="トレーニング">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>トレーニングタイマー</title>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <section id="homeView" class="view active" aria-labelledby="homeTitle">
+      <header class="topbar home-topbar">
+        <div>
+          <p class="eyebrow">OFFLINE TRAINING</p>
+          <h1 id="homeTitle">トレーニング</h1>
+        </div>
+        <span id="offlineBadge" class="status-badge" aria-live="polite">準備中</span>
+      </header>
+
+      <main class="home-grid">
+        <button id="openTimerBtn" class="mode-card" type="button">
+          <span class="mode-icon" aria-hidden="true">⏱</span>
+          <span class="mode-title">タイマー</span>
+          <span class="mode-description">複数の秒数を順番にカウントダウン</span>
+        </button>
+
+        <button id="openDirectionBtn" class="mode-card" type="button">
+          <span class="mode-icon direction-symbol" aria-hidden="true">➜</span>
+          <span class="mode-title">ランダム方向指示</span>
+          <span class="mode-description">6方向を音と大きな矢印で表示</span>
+        </button>
+      </main>
+
+      <footer class="home-footer">
+        <button id="showInstallHelpBtn" class="text-button" type="button">iPhoneへの追加方法</button>
+      </footer>
+    </section>
+
+    <section id="timerSetupView" class="view" aria-labelledby="timerSetupTitle">
+      <header class="topbar">
+        <button class="back-button" data-back-home type="button" aria-label="メニューに戻る">‹</button>
+        <h1 id="timerSetupTitle">タイマー設定</h1>
+        <span class="header-spacer" aria-hidden="true"></span>
+      </header>
+
+      <main class="settings-content">
+        <section class="panel">
+          <label class="field-label" for="timerPresetSelect">保存済み設定</label>
+          <div class="row gap-sm">
+            <select id="timerPresetSelect" class="field grow" aria-label="保存済みタイマー設定"></select>
+            <button id="loadTimerPresetBtn" class="secondary-button" type="button">読込</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <label class="field-label" for="durationInput">秒数</label>
+          <input id="durationInput" class="field large-field" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 10, 20, 30" aria-describedby="durationHelp">
+          <p id="durationHelp" class="field-help">カンマ・空白・改行で区切れます。各1〜3600秒。</p>
+
+          <div class="segmented-control" role="group" aria-label="繰り返し設定">
+            <label>
+              <input type="radio" name="repeatMode" value="once" checked>
+              <span>1回のみ</span>
+            </label>
+            <label>
+              <input type="radio" name="repeatMode" value="repeat">
+              <span>繰り返し</span>
+            </label>
+          </div>
+
+          <div id="repeatCountRow" class="field-group hidden">
+            <label class="field-label" for="repeatCountInput">繰り返し回数</label>
+            <div class="number-stepper">
+              <button type="button" data-step-target="repeatCountInput" data-step="-1" aria-label="繰り返し回数を減らす">−</button>
+              <input id="repeatCountInput" type="number" min="2" max="99" step="1" value="3" inputmode="numeric">
+              <button type="button" data-step-target="repeatCountInput" data-step="1" aria-label="繰り返し回数を増やす">＋</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <label class="field-label" for="timerPresetName">この設定を保存</label>
+          <div class="row gap-sm">
+            <input id="timerPresetName" class="field grow" type="text" maxlength="30" placeholder="例: 10-20-30 × 3">
+            <button id="saveTimerPresetBtn" class="secondary-button" type="button">保存</button>
+          </div>
+          <button id="deleteTimerPresetBtn" class="danger-text-button" type="button">選択中の保存設定を削除</button>
+        </section>
+
+        <p id="timerSetupError" class="error-message" role="alert"></p>
+
+        <div class="action-stack">
+          <button id="testSoundTimerBtn" class="secondary-button wide-button" type="button">音を確認</button>
+          <button id="startTimerBtn" class="primary-button wide-button" type="button">開始</button>
+        </div>
+      </main>
+    </section>
+
+    <section id="timerRunView" class="view run-view" aria-labelledby="timerRunTitle">
+      <header class="run-header">
+        <button id="exitTimerBtn" class="run-icon-button" type="button" aria-label="タイマーを終了">×</button>
+        <div id="timerProgress" class="run-progress">1 / 1</div>
+        <button id="fullscreenTimerBtn" class="run-icon-button" type="button" aria-label="全画面表示">⛶</button>
+      </header>
+
+      <main class="timer-stage">
+        <p id="timerRunTitle" class="run-label">残り</p>
+        <div id="countdownDisplay" class="countdown-display" aria-live="off">10</div>
+        <p id="timerSegmentInfo" class="run-subline">区間 1 / 1</p>
+        <p id="timerNextInfo" class="run-next">次: 終了</p>
+      </main>
+
+      <footer class="run-controls">
+        <button id="pauseTimerBtn" class="control-button" type="button">一時停止</button>
+        <button id="restartTimerBtn" class="control-button" type="button">最初から</button>
+      </footer>
+      <div id="timerPausedOverlay" class="paused-overlay hidden" aria-live="polite">一時停止</div>
+    </section>
+
+    <section id="directionSetupView" class="view" aria-labelledby="directionSetupTitle">
+      <header class="topbar">
+        <button class="back-button" data-back-home type="button" aria-label="メニューに戻る">‹</button>
+        <h1 id="directionSetupTitle">方向指示設定</h1>
+        <span class="header-spacer" aria-hidden="true"></span>
+      </header>
+
+      <main class="settings-content">
+        <section class="panel">
+          <label class="field-label" for="directionPresetSelect">保存済み設定</label>
+          <div class="row gap-sm">
+            <select id="directionPresetSelect" class="field grow" aria-label="保存済み方向指示設定"></select>
+            <button id="loadDirectionPresetBtn" class="secondary-button" type="button">読込</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="segmented-control" role="group" aria-label="間隔方式">
+            <label>
+              <input type="radio" name="intervalMode" value="fixed" checked>
+              <span>指定間隔</span>
+            </label>
+            <label>
+              <input type="radio" name="intervalMode" value="random">
+              <span>ランダム</span>
+            </label>
+          </div>
+
+          <div id="fixedIntervalRow" class="field-group">
+            <label class="field-label" for="fixedIntervalSelect">切り替え間隔</label>
+            <select id="fixedIntervalSelect" class="field"></select>
+          </div>
+
+          <div id="randomIntervalRow" class="field-group hidden">
+            <span class="field-label">ランダム範囲</span>
+            <div class="range-row">
+              <select id="randomMinSelect" class="field" aria-label="最短間隔"></select>
+              <span>〜</span>
+              <select id="randomMaxSelect" class="field" aria-label="最長間隔"></select>
+            </div>
+            <p class="field-help">整数秒から毎回ランダムに選びます。</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <label class="field-label" for="directionPresetName">この設定を保存</label>
+          <div class="row gap-sm">
+            <input id="directionPresetName" class="field grow" type="text" maxlength="30" placeholder="例: ランダム 2〜5秒">
+            <button id="saveDirectionPresetBtn" class="secondary-button" type="button">保存</button>
+          </div>
+          <button id="deleteDirectionPresetBtn" class="danger-text-button" type="button">選択中の保存設定を削除</button>
+        </section>
+
+        <p id="directionSetupError" class="error-message" role="alert"></p>
+
+        <div class="action-stack">
+          <button id="testSoundDirectionBtn" class="secondary-button wide-button" type="button">音を確認</button>
+          <button id="startDirectionBtn" class="primary-button wide-button" type="button">開始</button>
+        </div>
+      </main>
+    </section>
+
+    <section id="directionRunView" class="view run-view direction-run-view" aria-labelledby="directionRunTitle">
+      <header class="run-header">
+        <button id="exitDirectionBtn" class="run-icon-button" type="button" aria-label="方向指示を終了">×</button>
+        <div id="directionCounter" class="run-progress">0回</div>
+        <button id="fullscreenDirectionBtn" class="run-icon-button" type="button" aria-label="全画面表示">⛶</button>
+      </header>
+
+      <main class="direction-stage">
+        <h1 id="directionRunTitle" class="visually-hidden">ランダム方向指示</h1>
+        <div id="arrowWrap" class="arrow-wrap hidden" aria-live="off">
+          <svg id="directionArrow" class="direction-arrow" viewBox="0 0 100 100" role="img" aria-labelledby="directionLabel">
+            <line x1="12" y1="50" x2="73" y2="50" stroke="currentColor" stroke-width="13" stroke-linecap="round"></line>
+            <polyline points="55,24 82,50 55,76" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          </svg>
+          <div id="directionLabel" class="direction-label">右</div>
+        </div>
+        <div id="directionReady" class="direction-ready">開始</div>
+      </main>
+
+      <footer class="run-controls">
+        <button id="pauseDirectionBtn" class="control-button" type="button">一時停止</button>
+        <button id="nextDirectionBtn" class="control-button" type="button">次の方向</button>
+      </footer>
+      <div id="directionPausedOverlay" class="paused-overlay hidden" aria-live="polite">一時停止</div>
+    </section>
+  </div>
+
+  <dialog id="installDialog" class="install-dialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h2>iPhoneへの追加方法</h2>
+        <button id="closeInstallDialogBtn" class="dialog-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <ol>
+        <li>このページをSafariで開く</li>
+        <li>共有ボタンを押す</li>
+        <li>「ホーム画面に追加」を選ぶ</li>
+        <li>追加後はホーム画面のアイコンから起動する</li>
+      </ol>
+      <p>最初に一度オンラインで開けば、その後はオフラインでも起動できます。</p>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
