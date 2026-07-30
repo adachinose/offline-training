@@ -8,6 +8,7 @@
   --muted: #aeb8cc;
   --accent: #77f2b1;
   --accent-strong: #44dc93;
+  --arrow-orange: #ff9f43;
   --danger: #ff8c96;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -151,7 +152,9 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .direction-stage { padding: 0 8px; }
 .arrow-wrap { width: min(86vw, 74vh); height: min(86vw, 74vh); display: grid; place-items: center; position: relative; }
-.direction-arrow { width: 100%; height: 100%; color: var(--accent); filter: drop-shadow(0 0 30px rgba(119,242,177,.18)); transform-origin: center; }
+.direction-arrow { width: 100%; height: 100%; transform-origin: center; transition: color .08s linear, filter .08s linear; }
+.direction-arrow.arrow-green { color: var(--accent); filter: drop-shadow(0 0 30px rgba(119,242,177,.22)); }
+.direction-arrow.arrow-orange { color: var(--arrow-orange); filter: drop-shadow(0 0 30px rgba(255,159,67,.24)); }
 .direction-label { position: absolute; bottom: -1.3rem; font-size: clamp(1.2rem, 5vw, 2.4rem); font-weight: 900; letter-spacing: .12em; }
 .direction-ready { font-size: clamp(3rem, 20vw, 8rem); font-weight: 900; color: #d9deeb; }
 

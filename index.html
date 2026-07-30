@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="トレーニング">
   <meta name="format-detection" content="telephone=no">
-  <link rel="manifest" href="manifest.webmanifest?v=1.4.1">
+  <link rel="manifest" href="manifest.webmanifest?v=1.5.0">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=1.4.1">
+  <link rel="stylesheet" href="styles.css?v=1.5.0">
   <title>トレーニングタイマー</title>
 </head>
 <body>
@@ -40,7 +40,7 @@
 
       <footer class="home-footer">
         <button id="showInstallHelpBtn" class="text-button" type="button">iPhoneへの追加方法</button>
-        <span class="version-label" data-app-version>v1.4.1</span>
+        <span class="version-label" data-app-version>v1.5.0</span>
       </footer>
     </section>
 
@@ -55,7 +55,7 @@
         <div class="setup-launch-inner">
           <div class="launch-heading-row">
             <label class="field-label" for="timerPresetSelect">保存済み設定</label>
-            <span class="version-label" data-app-version>v1.4.1</span>
+            <span class="version-label" data-app-version>v1.5.0</span>
           </div>
           <div class="row gap-sm">
             <select id="timerPresetSelect" class="field grow" aria-label="保存済みタイマー設定"></select>
@@ -141,7 +141,7 @@
         <div class="setup-launch-inner">
           <div class="launch-heading-row">
             <label class="field-label" for="directionPresetSelect">保存済み設定</label>
-            <span class="version-label" data-app-version>v1.4.1</span>
+            <span class="version-label" data-app-version>v1.5.0</span>
           </div>
           <div class="row gap-sm">
             <select id="directionPresetSelect" class="field grow" aria-label="保存済み方向指示設定"></select>
@@ -213,7 +213,7 @@
       <main class="direction-stage">
         <h1 id="directionRunTitle" class="visually-hidden">ランダム方向指示</h1>
         <div id="arrowWrap" class="arrow-wrap hidden" aria-live="off">
-          <svg id="directionArrow" class="direction-arrow" viewBox="0 0 100 100" role="img" aria-labelledby="directionLabel">
+          <svg id="directionArrow" class="direction-arrow arrow-green" viewBox="0 0 100 100" role="img" aria-labelledby="directionLabel">
             <line x1="12" y1="50" x2="73" y2="50" stroke="currentColor" stroke-width="13" stroke-linecap="round"></line>
             <polyline points="55,24 82,50 55,76" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"></polyline>
           </svg>
@@ -247,6 +247,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.4.1" defer></script>
+  <script src="app.js?v=1.5.0" defer></script>
 </body>
 </html>

@@ -1,8 +1,9 @@
 'use strict';
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.5.0';
 const STORAGE_KEY = 'offline-training-settings-v1';
 const BLANK_MS = 180;
+const START_COUNTDOWN_MS = 3000;
 
 const DEFAULT_DATA = {
   timerPresets: [
@@ -35,6 +36,7 @@ const activeTimerCueOscillators = new Set();
 const timerRun = {
   active: false,
   paused: false,
+  phase: 'idle',
   durations: [],
   repeatCount: 1,
   roundIndex: 0,
@@ -56,6 +58,10 @@ const directionRun = {
   phase: 'idle',
   transitionTimer: null,
   blankTimer: null,
+  countdownTimer: null,
+  countdownDisplayTimer: null,
+  countdownEndAt: 0,
+  countdownRemainingMs: 0,
   endTimer: null,
   progressTimer: null,
   nextTransitionAt: 0,
@@ -371,10 +377,18 @@ function updateTimerScreen() {
   const remaining = timerRun.paused
     ? timerRun.remainingMs
     : Math.max(0, timerRun.endAt - Date.now());
-  const displaySeconds = String(Math.ceil(remaining / 1000));
+  const displaySeconds = String(Math.max(0, Math.ceil(remaining / 1000)));
   const countdown = $('countdownDisplay');
   countdown.textContent = displaySeconds;
   countdown.dataset.digits = String(displaySeconds.length);
+
+  if (timerRun.phase === 'prestart') {
+    $('timerProgress').textContent = '開始まで';
+    $('timerSegmentInfo').textContent = '準備';
+    $('timerNextInfo').textContent = `次: ${timerRun.durations[0]}秒`;
+    return;
+  }
+
   $('timerProgress').textContent = `セット ${timerRun.roundIndex + 1} / ${timerRun.repeatCount}`;
   $('timerSegmentInfo').textContent = `区間 ${timerRun.segmentIndex + 1} / ${timerRun.durations.length}`;
 
@@ -393,8 +407,25 @@ function scheduleTimer() {
   clearTimerHandles();
   updateTimerScreen();
   const delay = Math.max(0, timerRun.endAt - Date.now());
-  timerRun.boundaryTimer = setTimeout(advanceTimer, delay);
+  const callback = timerRun.phase === 'prestart' ? beginTimerWorkout : advanceTimer;
+  timerRun.boundaryTimer = setTimeout(callback, delay);
   timerRun.displayTimer = setInterval(updateTimerScreen, 100);
+}
+
+function beginTimerCountdown(delay = START_COUNTDOWN_MS) {
+  timerRun.phase = 'prestart';
+  timerRun.remainingMs = Math.max(0, delay);
+  timerRun.endAt = Date.now() + timerRun.remainingMs;
+  scheduleTimer();
+}
+
+function beginTimerWorkout() {
+  if (!timerRun.active || timerRun.paused) return;
+  clearTimerHandles();
+  timerRun.phase = 'running';
+  timerRun.remainingMs = 0;
+  timerRun.endAt = Date.now() + timerRun.durations[timerRun.segmentIndex] * 1000;
+  scheduleTimer();
 }
 
 function advanceTimer() {
@@ -446,18 +477,19 @@ async function startTimer() {
   stopTimerCue();
   timerRun.active = true;
   timerRun.paused = false;
+  timerRun.phase = 'prestart';
   timerRun.durations = settings.durations;
   timerRun.repeatCount = settings.repeatCount;
   timerRun.roundIndex = 0;
   timerRun.segmentIndex = 0;
-  timerRun.remainingMs = 0;
-  timerRun.endAt = Date.now() + settings.durations[0] * 1000;
+  timerRun.remainingMs = START_COUNTDOWN_MS;
+  timerRun.endAt = 0;
   $('timerPausedOverlay').classList.add('hidden');
   $('pauseTimerBtn').textContent = '一時停止';
   showView('timerRunView');
   const locked = await requestWakeLock();
   if (!locked && !('wakeLock' in navigator)) showToast('画面が消える場合は自動ロックを一時的に解除してください。');
-  scheduleTimer();
+  beginTimerCountdown();
 }
 
 function pauseTimer(auto = false) {
@@ -490,14 +522,15 @@ function restartTimer() {
   stopTimerCue();
   timerRun.active = true;
   timerRun.paused = false;
+  timerRun.phase = 'prestart';
   timerRun.roundIndex = 0;
   timerRun.segmentIndex = 0;
-  timerRun.remainingMs = 0;
-  timerRun.endAt = Date.now() + timerRun.durations[0] * 1000;
+  timerRun.remainingMs = START_COUNTDOWN_MS;
+  timerRun.endAt = 0;
   $('timerPausedOverlay').classList.add('hidden');
   $('pauseTimerBtn').textContent = '一時停止';
   requestWakeLock();
-  scheduleTimer();
+  beginTimerCountdown();
 }
 
 function stopTimer() {
@@ -505,6 +538,7 @@ function stopTimer() {
   stopTimerCue();
   timerRun.active = false;
   timerRun.paused = false;
+  timerRun.phase = 'idle';
   releaseWakeLock();
   showView('timerSetupView');
 }
@@ -515,16 +549,23 @@ function directionIntervalMs() {
   return seconds * 1000;
 }
 
-function setArrow(direction) {
-  $('directionArrow').style.transform = `rotate(${direction.angle}deg)`;
+function setArrow(direction, colorClass) {
+  const arrow = $('directionArrow');
+  arrow.style.transform = `rotate(${direction.angle}deg)`;
+  arrow.classList.remove('arrow-green', 'arrow-orange');
+  arrow.classList.add(colorClass);
   $('directionLabel').textContent = direction.label;
 }
 
 function clearDirectionSwitchHandles() {
   clearTimeout(directionRun.transitionTimer);
   clearTimeout(directionRun.blankTimer);
+  clearTimeout(directionRun.countdownTimer);
+  clearInterval(directionRun.countdownDisplayTimer);
   directionRun.transitionTimer = null;
   directionRun.blankTimer = null;
+  directionRun.countdownTimer = null;
+  directionRun.countdownDisplayTimer = null;
 }
 
 function clearDirectionExecutionHandles() {
@@ -573,6 +614,35 @@ function scheduleDirectionTransition(delay = directionIntervalMs()) {
   directionRun.transitionTimer = setTimeout(beginDirectionTransition, actualDelay);
 }
 
+function updateDirectionCountdown() {
+  if (!directionRun.active || directionRun.phase !== 'prestart') return;
+  const remaining = directionRun.paused
+    ? directionRun.countdownRemainingMs
+    : Math.max(0, directionRun.countdownEndAt - Date.now());
+  $('directionReady').textContent = String(Math.max(0, Math.ceil(remaining / 1000)));
+  $('directionCounter').textContent = '開始まで';
+}
+
+function beginDirectionCountdown(delay = START_COUNTDOWN_MS) {
+  clearDirectionSwitchHandles();
+  directionRun.phase = 'prestart';
+  directionRun.countdownRemainingMs = Math.max(0, delay);
+  directionRun.countdownEndAt = Date.now() + directionRun.countdownRemainingMs;
+  $('arrowWrap').classList.add('hidden');
+  $('directionReady').classList.remove('hidden');
+  updateDirectionCountdown();
+  directionRun.countdownTimer = setTimeout(beginDirectionWorkout, directionRun.countdownRemainingMs);
+  directionRun.countdownDisplayTimer = setInterval(updateDirectionCountdown, 100);
+}
+
+function beginDirectionWorkout() {
+  if (!directionRun.active || directionRun.paused) return;
+  clearDirectionSwitchHandles();
+  directionRun.countdownRemainingMs = 0;
+  directionRun.phase = 'blank';
+  emitDirection();
+}
+
 function emitDirection() {
   if (!directionRun.active || directionRun.paused) return;
   if (directionRun.runSeconds && !directionRun.executionStarted) {
@@ -583,7 +653,8 @@ function emitDirection() {
     return;
   }
   const direction = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
-  setArrow(direction);
+  const colorClass = directionRun.count % 2 === 0 ? 'arrow-green' : 'arrow-orange';
+  setArrow(direction, colorClass);
   $('directionReady').classList.add('hidden');
   $('arrowWrap').classList.remove('hidden');
   directionRun.phase = 'shown';
@@ -622,8 +693,10 @@ async function startDirection() {
     active: true,
     paused: false,
     count: 0,
-    phase: 'blank',
+    phase: 'prestart',
     remainingMs: 0,
+    countdownEndAt: 0,
+    countdownRemainingMs: START_COUNTDOWN_MS,
     executionStarted: false,
     executionEndAt: 0,
     executionRemainingMs: settings.runSeconds ? settings.runSeconds * 1000 : 0
@@ -631,18 +704,20 @@ async function startDirection() {
   updateDirectionCounter();
   $('arrowWrap').classList.add('hidden');
   $('directionReady').classList.remove('hidden');
-  $('directionReady').textContent = '開始';
+  $('directionReady').textContent = '3';
   $('directionPausedOverlay').classList.add('hidden');
   $('pauseDirectionBtn').textContent = '一時停止';
   showView('directionRunView');
   const locked = await requestWakeLock();
   if (!locked && !('wakeLock' in navigator)) showToast('画面が消える場合は自動ロックを一時的に解除してください。');
-  directionRun.blankTimer = setTimeout(emitDirection, 500);
+  beginDirectionCountdown();
 }
 
 function pauseDirection(auto = false) {
   if (!directionRun.active || directionRun.paused) return;
-  if (directionRun.phase === 'shown') {
+  if (directionRun.phase === 'prestart') {
+    directionRun.countdownRemainingMs = Math.max(0, directionRun.countdownEndAt - Date.now());
+  } else if (directionRun.phase === 'shown') {
     directionRun.remainingMs = Math.max(0, directionRun.nextTransitionAt - Date.now());
   } else {
     directionRun.remainingMs = 0;
@@ -654,7 +729,8 @@ function pauseDirection(auto = false) {
   }
   directionRun.paused = true;
   clearDirectionHandles();
-  updateDirectionCounter();
+  if (directionRun.phase === 'prestart') updateDirectionCountdown();
+  else updateDirectionCounter();
   $('directionPausedOverlay').classList.remove('hidden');
   $('pauseDirectionBtn').textContent = '再開';
   releaseWakeLock();
@@ -672,6 +748,10 @@ async function resumeDirection() {
   $('directionPausedOverlay').classList.add('hidden');
   $('pauseDirectionBtn').textContent = '一時停止';
   await requestWakeLock();
+  if (directionRun.phase === 'prestart') {
+    beginDirectionCountdown(directionRun.countdownRemainingMs);
+    return;
+  }
   if (directionRun.runSeconds && directionRun.executionStarted) {
     scheduleDirectionExecution(directionRun.executionRemainingMs);
   }
@@ -697,8 +777,10 @@ async function restartDirection() {
     active: true,
     paused: false,
     count: 0,
-    phase: 'blank',
+    phase: 'prestart',
     remainingMs: 0,
+    countdownEndAt: 0,
+    countdownRemainingMs: START_COUNTDOWN_MS,
     executionStarted: false,
     executionEndAt: 0,
     executionRemainingMs: directionRun.runSeconds ? directionRun.runSeconds * 1000 : 0
@@ -706,11 +788,11 @@ async function restartDirection() {
   updateDirectionCounter();
   $('arrowWrap').classList.add('hidden');
   $('directionReady').classList.remove('hidden');
-  $('directionReady').textContent = '開始';
+  $('directionReady').textContent = '3';
   $('directionPausedOverlay').classList.add('hidden');
   $('pauseDirectionBtn').textContent = '一時停止';
   await requestWakeLock();
-  directionRun.blankTimer = setTimeout(emitDirection, 500);
+  beginDirectionCountdown();
 }
 
 function finishDirection() {
@@ -718,6 +800,7 @@ function finishDirection() {
   clearDirectionHandles();
   directionRun.active = false;
   directionRun.paused = false;
+  directionRun.phase = 'idle';
   directionRun.executionRemainingMs = 0;
   $('arrowWrap').classList.add('hidden');
   $('directionReady').classList.remove('hidden');
@@ -734,6 +817,7 @@ function stopDirection() {
   clearDirectionHandles();
   directionRun.active = false;
   directionRun.paused = false;
+  directionRun.phase = 'idle';
   releaseWakeLock();
   showView('directionSetupView');
 }
