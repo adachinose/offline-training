@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="トレーニング">
   <meta name="format-detection" content="telephone=no">
-  <link rel="manifest" href="manifest.webmanifest?v=1.6.0">
+  <link rel="manifest" href="manifest.webmanifest?v=1.7.0">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=1.6.0">
+  <link rel="stylesheet" href="styles.css?v=1.7.0">
   <title>トレーニングタイマー</title>
 </head>
 <body>
@@ -40,7 +40,7 @@
 
       <footer class="home-footer">
         <button id="showInstallHelpBtn" class="text-button" type="button">iPhoneへの追加方法</button>
-        <span class="version-label" data-app-version>v1.6.0</span>
+        <span class="version-label" data-app-version>v1.7.0</span>
       </footer>
     </section>
 
@@ -55,7 +55,7 @@
         <div class="setup-launch-inner">
           <div class="launch-heading-row">
             <label class="field-label" for="timerPresetSelect">保存済み設定</label>
-            <span class="version-label" data-app-version>v1.6.0</span>
+            <span class="version-label" data-app-version>v1.7.0</span>
           </div>
           <div class="row gap-sm">
             <select id="timerPresetSelect" class="field grow" aria-label="保存済みタイマー設定"></select>
@@ -141,7 +141,7 @@
         <div class="setup-launch-inner">
           <div class="launch-heading-row">
             <label class="field-label" for="directionPresetSelect">保存済み設定</label>
-            <span class="version-label" data-app-version>v1.6.0</span>
+            <span class="version-label" data-app-version>v1.7.0</span>
           </div>
           <div class="row gap-sm">
             <select id="directionPresetSelect" class="field grow" aria-label="保存済み方向指示設定"></select>
@@ -176,19 +176,19 @@
               <span>〜</span>
               <select id="randomMaxSelect" class="field" aria-label="最長間隔"></select>
             </div>
-            <p class="field-help">整数秒から毎回ランダムに選びます。</p>
+            <p class="field-help">1〜10秒の範囲を0.5秒刻みで指定し、両端を含めて毎回ランダムに選びます。</p>
           </div>
 
           <div class="field-group">
-            <label class="field-label" for="directionRunSecondsInput">1セットの実行時間（秒・任意）</label>
-            <input id="directionRunSecondsInput" class="field large-field" type="number" min="1" max="86400" step="1" inputmode="numeric" placeholder="未入力なら停止するまで">
-            <p class="field-help">指定した秒数で1セットを終了します。未入力の場合は停止するまで続けます。</p>
+            <label class="field-label" for="directionRunSecondsInput">1セットの実行時間（秒）</label>
+            <input id="directionRunSecondsInput" class="field large-field" type="number" min="1" max="86400" step="1" inputmode="numeric" value="30" required aria-required="true" placeholder="例: 30">
+            <p class="field-help">必須。指定した秒数で各セットを終了します。1〜86400秒の整数で入力してください。</p>
           </div>
 
           <div class="field-group">
             <label class="field-label" for="directionSetCountInput">セット数（任意）</label>
             <input id="directionSetCountInput" class="field large-field" type="number" min="2" max="99" step="1" inputmode="numeric" placeholder="未入力なら1セット">
-            <p class="field-help">2〜99セット。複数セットでは1セットの実行時間が必須です。</p>
+            <p class="field-help">未入力なら1セット。2〜99を入れると複数セットで実行します。</p>
           </div>
 
           <div id="directionSetIntervalRow" class="field-group hidden">
@@ -259,6 +259,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.6.0" defer></script>
+  <script src="app.js?v=1.7.0" defer></script>
 </body>
 </html>

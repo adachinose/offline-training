@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const STORAGE_KEY = 'offline-training-settings-v1';
 const BLANK_MS = 180;
 const START_COUNTDOWN_MS = 3000;
@@ -10,10 +10,10 @@ const DEFAULT_DATA = {
     { id: 'sample-timer', name: '10-20-30 × 3', durations: [10, 20, 30], repeatCount: 3 }
   ],
   directionPresets: [
-    { id: 'sample-direction', name: 'ランダム 2〜5秒', mode: 'random', fixed: 3, min: 2, max: 5, runSeconds: null, setCount: null, setIntervalSeconds: 30 }
+    { id: 'sample-direction', name: 'ランダム 2〜5秒・30秒間', mode: 'random', fixed: 3, min: 2, max: 5, runSeconds: 30, setCount: null, setIntervalSeconds: 30 }
   ],
   lastTimer: { durations: [10, 20, 30], repeatCount: 1 },
-  lastDirection: { mode: 'random', fixed: 3, min: 2, max: 5, runSeconds: null, setCount: null, setIntervalSeconds: 30 }
+  lastDirection: { mode: 'random', fixed: 3, min: 2, max: 5, runSeconds: 30, setCount: null, setIntervalSeconds: 30 }
 };
 
 const DIRECTIONS = [
@@ -66,7 +66,7 @@ const directionRun = {
   progressTimer: null,
   nextTransitionAt: 0,
   remainingMs: 0,
-  runSeconds: null,
+  runSeconds: 30,
   executionStarted: false,
   executionEndAt: 0,
   executionRemainingMs: 0,
@@ -84,15 +84,24 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normalizeDirectionSettings(settings = {}) {
+  return {
+    ...settings,
+    // v1.6.1以前の無制限設定は、必須仕様の既定値30秒へ移行する。
+    runSeconds: clampInteger(settings.runSeconds, 1, 86400, 30)
+  };
+}
+
 function loadData() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!stored || typeof stored !== 'object') return clone(DEFAULT_DATA);
     return {
       timerPresets: Array.isArray(stored.timerPresets) ? stored.timerPresets : clone(DEFAULT_DATA.timerPresets),
-      directionPresets: Array.isArray(stored.directionPresets) ? stored.directionPresets : clone(DEFAULT_DATA.directionPresets),
+      directionPresets: (Array.isArray(stored.directionPresets) ? stored.directionPresets : clone(DEFAULT_DATA.directionPresets))
+        .map(normalizeDirectionSettings),
       lastTimer: stored.lastTimer || clone(DEFAULT_DATA.lastTimer),
-      lastDirection: stored.lastDirection || clone(DEFAULT_DATA.lastDirection)
+      lastDirection: normalizeDirectionSettings(stored.lastDirection || clone(DEFAULT_DATA.lastDirection))
     };
   } catch (error) {
     console.warn('設定を読み込めませんでした。', error);
@@ -139,6 +148,26 @@ function fillSecondSelect(select, selected) {
     option.value = String(value);
     option.textContent = `${value}秒`;
     option.selected = value === selected;
+    select.append(option);
+  }
+}
+
+function clampHalfSecond(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const rounded = Math.round(parsed * 2) / 2;
+  return Math.min(max, Math.max(min, rounded));
+}
+
+function fillHalfSecondSelect(select, selected) {
+  const normalized = clampHalfSecond(selected, 1, 10, 2);
+  select.innerHTML = '';
+  for (let step = 2; step <= 20; step += 1) {
+    const value = step / 2;
+    const option = document.createElement('option');
+    option.value = String(value);
+    option.textContent = `${Number.isInteger(value) ? value : value.toFixed(1)}秒`;
+    option.selected = value === normalized;
     select.append(option);
   }
 }
@@ -205,12 +234,14 @@ function updateRepeatVisibility() {
   $('repeatCountRow').classList.toggle('hidden', mode !== 'repeat');
 }
 
-function parseOptionalRunSeconds(raw) {
+function parseRequiredRunSeconds(raw) {
   const value = raw.trim();
-  if (!value) return null;
+  if (!value) {
+    throw new Error('1セットの実行時間を入力してください。');
+  }
   const seconds = Number(value);
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400) {
-    throw new Error('実行時間は1〜86400秒の整数、または未入力にしてください。');
+    throw new Error('1セットの実行時間は1〜86400秒の整数で入力してください。');
   }
   return seconds;
 }
@@ -238,14 +269,11 @@ function parseSetIntervalSeconds(raw, required) {
 function getDirectionFormValues() {
   const mode = document.querySelector('input[name="intervalMode"]:checked').value;
   const fixed = clampInteger($('fixedIntervalSelect').value, 1, 10, 3);
-  let min = clampInteger($('randomMinSelect').value, 1, 10, 2);
-  let max = clampInteger($('randomMaxSelect').value, 1, 10, 5);
-  const runSeconds = parseOptionalRunSeconds($('directionRunSecondsInput').value);
+  let min = clampHalfSecond($('randomMinSelect').value, 1, 10, 2);
+  let max = clampHalfSecond($('randomMaxSelect').value, 1, 10, 5);
+  const runSeconds = parseRequiredRunSeconds($('directionRunSecondsInput').value);
   const setCount = parseOptionalSetCount($('directionSetCountInput').value);
   const setIntervalSeconds = parseSetIntervalSeconds($('directionSetIntervalInput').value, Boolean(setCount));
-  if (setCount && !runSeconds) {
-    throw new Error('複数セットを実行する場合は、1セットの実行時間を指定してください。');
-  }
   if (min > max) [min, max] = [max, min];
   $('randomMinSelect').value = String(min);
   $('randomMaxSelect').value = String(max);
@@ -255,11 +283,10 @@ function getDirectionFormValues() {
 function applyDirectionSettings(settings) {
   const mode = settings.mode === 'random' ? 'random' : 'fixed';
   const fixed = clampInteger(settings.fixed, 1, 10, 3);
-  let min = clampInteger(settings.min, 1, 10, 2);
-  let max = clampInteger(settings.max, 1, 10, 5);
-  const runSeconds = settings.runSeconds == null
-    ? null
-    : clampInteger(settings.runSeconds, 1, 86400, null);
+  let min = clampHalfSecond(settings.min, 1, 10, 2);
+  let max = clampHalfSecond(settings.max, 1, 10, 5);
+  // 旧版の無制限設定は30秒へ補正して、必須入力の新仕様へ移行する。
+  const runSeconds = clampInteger(settings.runSeconds, 1, 86400, 30);
   const setCount = settings.setCount == null
     ? null
     : clampInteger(settings.setCount, 2, 99, null);
@@ -267,9 +294,9 @@ function applyDirectionSettings(settings) {
   if (min > max) [min, max] = [max, min];
   document.querySelector(`input[name="intervalMode"][value="${mode}"]`).checked = true;
   fillSecondSelect($('fixedIntervalSelect'), fixed);
-  fillSecondSelect($('randomMinSelect'), min);
-  fillSecondSelect($('randomMaxSelect'), max);
-  $('directionRunSecondsInput').value = runSeconds == null ? '' : String(runSeconds);
+  fillHalfSecondSelect($('randomMinSelect'), min);
+  fillHalfSecondSelect($('randomMaxSelect'), max);
+  $('directionRunSecondsInput').value = String(runSeconds);
   $('directionSetCountInput').value = setCount == null ? '' : String(setCount);
   $('directionSetIntervalInput').value = String(setIntervalSeconds);
   updateIntervalVisibility();
@@ -590,8 +617,10 @@ function stopTimer() {
 
 function directionIntervalMs() {
   if (directionRun.mode === 'fixed') return directionRun.fixed * 1000;
-  const seconds = directionRun.min + Math.floor(Math.random() * (directionRun.max - directionRun.min + 1));
-  return seconds * 1000;
+  const minStep = Math.round(directionRun.min * 2);
+  const maxStep = Math.round(directionRun.max * 2);
+  const selectedStep = minStep + Math.floor(Math.random() * (maxStep - minStep + 1));
+  return selectedStep * 500;
 }
 
 function setArrow(direction, colorClass) {
@@ -640,7 +669,6 @@ function clearDirectionHandles() {
 }
 
 function directionRemainingMs() {
-  if (!directionRun.runSeconds) return null;
   if (!directionRun.executionStarted) return directionRun.executionRemainingMs;
   if (directionRun.paused) return directionRun.executionRemainingMs;
   return Math.max(0, directionRun.executionEndAt - Date.now());
@@ -662,13 +690,10 @@ function updateDirectionCounter() {
   const setPrefix = directionRun.setCount > 1
     ? `セット ${directionRun.currentSet}/${directionRun.setCount}・`
     : '';
-  $('directionCounter').textContent = remaining == null
-    ? `${setPrefix}${directionRun.setArrowCount}回`
-    : `${setPrefix}${directionRun.setArrowCount}回・残り ${Math.ceil(remaining / 1000)}秒`;
+  $('directionCounter').textContent = `${setPrefix}${directionRun.setArrowCount}回・残り ${Math.ceil(remaining / 1000)}秒`;
 }
 
 function scheduleDirectionExecution(delay) {
-  if (!directionRun.runSeconds) return;
   clearDirectionExecutionHandles();
   directionRun.executionStarted = true;
   directionRun.executionRemainingMs = Math.max(0, delay);
@@ -682,7 +707,7 @@ function scheduleDirectionTransition(delay = directionIntervalMs()) {
   clearTimeout(directionRun.transitionTimer);
   let actualDelay = delay;
   const runRemaining = directionRemainingMs();
-  if (runRemaining != null) actualDelay = Math.min(actualDelay, runRemaining);
+  actualDelay = Math.min(actualDelay, runRemaining);
   directionRun.nextTransitionAt = Date.now() + actualDelay;
   directionRun.transitionTimer = setTimeout(beginDirectionTransition, actualDelay);
 }
@@ -718,10 +743,10 @@ function beginDirectionWorkout() {
 
 function emitDirection() {
   if (!directionRun.active || directionRun.paused) return;
-  if (directionRun.runSeconds && !directionRun.executionStarted) {
+  if (!directionRun.executionStarted) {
     scheduleDirectionExecution(directionRun.executionRemainingMs);
   }
-  if (directionRun.runSeconds && directionRemainingMs() <= 0) {
+  if (directionRemainingMs() <= 0) {
     completeDirectionSet();
     return;
   }
@@ -740,7 +765,7 @@ function emitDirection() {
 
 function beginDirectionTransition() {
   if (!directionRun.active || directionRun.paused) return;
-  if (directionRun.runSeconds && directionRemainingMs() <= 0) {
+  if (directionRemainingMs() <= 0) {
     completeDirectionSet();
     return;
   }
@@ -776,7 +801,7 @@ function beginNextDirectionSet() {
   directionRun.setArrowCount = 0;
   directionRun.executionStarted = false;
   directionRun.executionEndAt = 0;
-  directionRun.executionRemainingMs = directionRun.runSeconds ? directionRun.runSeconds * 1000 : 0;
+  directionRun.executionRemainingMs = directionRun.runSeconds * 1000;
   directionRun.intervalRemainingMs = 0;
   directionRun.phase = 'blank';
   setDirectionReady('開始');
@@ -789,7 +814,7 @@ function completeDirectionSet() {
   if (directionRun.currentSet < directionRun.setCount) {
     directionRun.executionStarted = false;
     directionRun.executionEndAt = 0;
-    directionRun.executionRemainingMs = directionRun.runSeconds ? directionRun.runSeconds * 1000 : 0;
+    directionRun.executionRemainingMs = directionRun.runSeconds * 1000;
     $('arrowWrap').classList.add('hidden');
     $('directionReady').classList.remove('hidden');
     playCue('directionFinish');
@@ -826,7 +851,7 @@ async function startDirection() {
     countdownRemainingMs: START_COUNTDOWN_MS,
     executionStarted: false,
     executionEndAt: 0,
-    executionRemainingMs: settings.runSeconds ? settings.runSeconds * 1000 : 0,
+    executionRemainingMs: settings.runSeconds * 1000,
     intervalEndAt: 0,
     intervalRemainingMs: 0
   });
@@ -853,7 +878,7 @@ function pauseDirection(auto = false) {
   } else {
     directionRun.remainingMs = 0;
   }
-  if (directionRun.runSeconds && directionRun.executionStarted) {
+  if (directionRun.executionStarted) {
     directionRun.executionRemainingMs = Math.max(0, directionRun.executionEndAt - Date.now());
   }
   directionRun.paused = true;
@@ -870,7 +895,7 @@ function pauseDirection(auto = false) {
 async function resumeDirection() {
   if (!directionRun.active || !directionRun.paused) return;
   try { await unlockAudio(); } catch (error) { showToast(error.message); return; }
-  if (directionRun.runSeconds && directionRun.executionStarted && directionRun.executionRemainingMs <= 0) {
+  if (directionRun.executionStarted && directionRun.executionRemainingMs <= 0) {
     completeDirectionSet();
     return;
   }
@@ -886,7 +911,7 @@ async function resumeDirection() {
     scheduleDirectionInterval(directionRun.intervalRemainingMs);
     return;
   }
-  if (directionRun.runSeconds && directionRun.executionStarted) {
+  if (directionRun.executionStarted) {
     scheduleDirectionExecution(directionRun.executionRemainingMs);
   }
   if (directionRun.phase === 'shown' && directionRun.remainingMs > 0) {
@@ -919,7 +944,7 @@ async function restartDirection() {
     countdownRemainingMs: START_COUNTDOWN_MS,
     executionStarted: false,
     executionEndAt: 0,
-    executionRemainingMs: directionRun.runSeconds ? directionRun.runSeconds * 1000 : 0,
+    executionRemainingMs: directionRun.runSeconds * 1000,
     intervalEndAt: 0,
     intervalRemainingMs: 0
   });
@@ -1016,9 +1041,7 @@ function saveDirectionPreset() {
   const intervalName = settings.mode === 'fixed'
     ? `指定 ${settings.fixed}秒`
     : `ランダム ${settings.min}〜${settings.max}秒`;
-  const durationName = settings.runSeconds
-    ? `${intervalName}・${settings.runSeconds}秒間`
-    : intervalName;
+  const durationName = `${intervalName}・${settings.runSeconds}秒間`;
   const defaultName = settings.setCount
     ? `${durationName}・${settings.setCount}セット・間${settings.setIntervalSeconds}秒`
     : durationName;
@@ -1149,8 +1172,8 @@ function initialize() {
   document.querySelectorAll('[data-app-version]').forEach((node) => { node.textContent = `v${APP_VERSION}`; });
   document.getElementById('nextDirectionBtn')?.remove();
   fillSecondSelect($('fixedIntervalSelect'), 3);
-  fillSecondSelect($('randomMinSelect'), 2);
-  fillSecondSelect($('randomMaxSelect'), 5);
+  fillHalfSecondSelect($('randomMinSelect'), 2);
+  fillHalfSecondSelect($('randomMaxSelect'), 5);
   renderTimerPresets();
   renderDirectionPresets();
   applyTimerSettings(appData.lastTimer);
