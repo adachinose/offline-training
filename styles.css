@@ -157,6 +157,9 @@ button { -webkit-tap-highlight-color: transparent; }
 .direction-arrow.arrow-orange { color: var(--arrow-orange); filter: drop-shadow(0 0 30px rgba(255,159,67,.24)); }
 .direction-label { position: absolute; bottom: -1.3rem; font-size: clamp(1.2rem, 5vw, 2.4rem); font-weight: 900; letter-spacing: .12em; }
 .direction-ready { font-size: clamp(3rem, 20vw, 8rem); font-weight: 900; color: #d9deeb; }
+.direction-ready.interval-display { display: flex; flex-direction: column; align-items: center; gap: .15em; font-size: clamp(3rem, 17vw, 7rem); line-height: .95; text-align: center; }
+.direction-ready .interval-title { font-size: .27em; letter-spacing: .08em; color: var(--muted); }
+.direction-ready .interval-seconds { font-variant-numeric: tabular-nums; }
 
 .install-dialog { width: min(92vw, 520px); border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); padding: 0; box-shadow: var(--shadow); }
 .install-dialog::backdrop { background: rgba(0,0,0,.68); }
